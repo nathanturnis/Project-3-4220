@@ -1,3 +1,4 @@
 .env
 server/google-service.json
 node_modules
+**/node_modules
