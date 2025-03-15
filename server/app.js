@@ -5,10 +5,15 @@ const multer = require('multer');
 const { Storage } = require('@google-cloud/storage');
 const mysql = require('mysql2/promise');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
 
+app.use(cors());
+
+process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 // Google Cloud Storage setup
 const storage = new Storage();
 const bucketName = process.env.BUCKET_NAME;
@@ -26,36 +31,105 @@ const db = mysql.createPool({
 // Multer setup for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
-// // Upload photo API
-// app.post('/upload', upload.single('photo'), async (req, res) => {
-//     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-//     const fileName = `${Date.now()}-${req.file.originalname}`;
-//     const file = bucket.file(fileName);
-
-//     const stream = file.createWriteStream({
-//         metadata: { contentType: req.file.mimetype },
-//     });
-
-//     stream.on('error', (err) => res.status(500).json({ error: err.message }));
-
-//     stream.on('finish', async () => {
-//         await file.makePublic();
-//         const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-
-//         // Save to Cloud SQL
-//         await db.query('INSERT INTO photos (name, url) VALUES (?, ?)', [fileName, publicUrl]);
-
-//         res.json({ name: fileName, url: publicUrl });
-//     });
-
-//     stream.end(req.file.buffer);
-// });
 
 // Fetch all photos API
 app.get('/photos', async (req, res) => {
-    const [rows] = await db.query('SELECT * FROM gallery');
-    res.json(rows);
+    try {
+        // Step 1: Query the database to get all photos
+        const [rows] = await db.execute('SELECT * FROM gallery');
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No photos found' });
+        }
+
+        // Step 2: Generate signed URLs for each photo
+        const photosWithSignedUrls = [];
+
+        for (const photo of rows) {
+            const file = bucket.file(photo.link);  // `photo.link` stores the object path (e.g., `1710513278123-uuid-image.jpg`)
+
+            const options = {
+                version: 'v4',
+                action: 'read',
+                expires: Date.now() + 60 * 60 * 1000, // URL valid for 1 hour
+            };
+
+            const [signedUrl] = await file.getSignedUrl(options);
+
+            // Add the signed URL to the photo object
+            photosWithSignedUrls.push({
+                id: photo.id,
+                user_id: photo.user_id,
+                photo_name: photo.photo_name,
+                link: signedUrl, // Store the signed URL in the response
+                created_dt: photo.created_dt,
+                modified_dt: photo.modified_dt,
+            });
+        }
+
+        // Step 3: Send the response with all photos and signed URLs
+        res.json(photosWithSignedUrls);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/photo', async (req, res) => {
+    try {
+        const file = bucket.file('image1.jpg');
+
+        // Generate a signed URL valid for 15 minutes
+        const [url] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        });
+
+        res.json({ url });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+app.post('/photos', upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        if (!req.body.photo_name) return res.status(400).json({ error: 'Photo name is required' });
+
+        const userFriendlyName = req.body.photo_name;
+        const uniqueFileName = `${Date.now()}-${uuidv4()}-${req.file.originalname}`;
+        const file = bucket.file(uniqueFileName);
+
+        // Upload file to Google Cloud Storage (Private)
+        const stream = file.createWriteStream({
+            metadata: { contentType: req.file.mimetype },
+        });
+
+        stream.on('error', (err) => res.status(500).json({ error: err.message }));
+
+        stream.on('finish', async () => {
+            // File is private, store the object path instead of the signed URL
+            const objectPath = uniqueFileName;
+
+            // Insert metadata into Cloud SQL with the object path
+            const createdDt = new Date();
+            const modifiedDt = createdDt;
+            const userId = 1234; // Hardcoded user ID
+            const id = uuidv4();
+
+            const sql = `
+                INSERT INTO gallery (id, user_id, photo_name, link, created_dt, modified_dt)
+                VALUES (?, ?, ?, ?, ?, ?)`;
+
+            await db.execute(sql, [id, userId, userFriendlyName, objectPath, createdDt, modifiedDt]);
+
+            res.json({ message: 'Photo uploaded', photoName: userFriendlyName });
+        });
+
+        stream.end(req.file.buffer);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
