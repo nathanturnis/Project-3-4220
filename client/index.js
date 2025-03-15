@@ -1,7 +1,9 @@
-// Function to fetch all photos from the backend
-async function fetchPhotos() {
+// Function to fetch photos based on the query (if any)
+async function fetchPhotos(query = '') {
     try {
-        const response = await fetch('http://localhost:3000/photos');
+        // If query exists, use it; otherwise, fetch all photos
+        const url = query ? `http://localhost:3000/photos/search?query=${query}` : 'http://localhost:3000/photos';
+        const response = await fetch(url);
         const photos = await response.json();
 
         console.log(photos);
@@ -41,11 +43,31 @@ async function fetchPhotos() {
             galleryElement.appendChild(photoDiv);
         });
 
-
     } catch (error) {
         console.error('Error fetching photos:', error);
     }
 }
 
-// Call the function to fetch photos when the page loads
-window.onload = fetchPhotos;
+// Handle form submission to search photos by name
+document.getElementById('SearchPhotosForm').addEventListener('submit', function (e) {
+    e.preventDefault();  // Prevent the form from submitting normally
+
+    const query = document.getElementById('SearchPhotosInput').value.trim(); // Get the search query
+
+    if (query) {
+        // Update the URL to include the search query
+        window.history.pushState({}, '', `?query=${query}`);
+
+        // Fetch photos based on the search query
+        fetchPhotos(query);
+    }
+});
+
+// Check if there is a query in the URL and fetch the appropriate photos
+window.onload = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('query');  // Get the 'query' parameter from the URL
+
+    // Call fetchPhotos with the query (if present)
+    fetchPhotos(query || '');
+};

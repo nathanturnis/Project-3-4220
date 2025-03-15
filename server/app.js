@@ -74,23 +74,6 @@ app.get('/photos', async (req, res) => {
     }
 });
 
-app.get('/photo', async (req, res) => {
-    try {
-        const file = bucket.file('image1.jpg');
-
-        // Generate a signed URL valid for 15 minutes
-        const [url] = await file.getSignedUrl({
-            action: 'read',
-            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-        });
-
-        res.json({ url });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-
 app.post('/photos', upload.single('photo'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -131,5 +114,61 @@ app.post('/photos', upload.single('photo'), async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+app.get('/photos/search', async (req, res) => {
+    try {
+        const { query } = req.query;  // Get the search query from the query string
+        if (!query) {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+
+        // SQL query to search photos by name (using LIKE for partial matching and LOWER for case-insensitivity)
+        const sql = `
+            SELECT id, user_id, photo_name, link, created_dt, modified_dt
+            FROM gallery
+            WHERE LOWER(photo_name) LIKE LOWER(?)`;  // Use LOWER() to make both sides case-insensitive
+
+        const [rows] = await db.execute(sql, [`%${query}%`]);  // Execute the query with LIKE search
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No photos found' });
+        }
+
+        // Array to store the photos with signed URLs
+        const photosWithSignedUrls = [];
+
+        // Iterate over the rows to generate signed URLs for each photo
+        for (const photo of rows) {
+            const file = bucket.file(photo.link);  // `photo.link` stores the object path (e.g., `1710513278123-uuid-image.jpg`)
+
+            // Define options for generating the signed URL
+            const options = {
+                version: 'v4',
+                action: 'read',
+                expires: Date.now() + 60 * 60 * 1000, // URL valid for 1 hour
+            };
+
+            // Generate the signed URL
+            const [signedUrl] = await file.getSignedUrl(options);
+
+            // Push the photo object with the signed URL to the result array
+            photosWithSignedUrls.push({
+                id: photo.id,
+                user_id: photo.user_id,
+                photo_name: photo.photo_name,
+                link: signedUrl, // Store the signed URL in the response
+                created_dt: photo.created_dt,
+                modified_dt: photo.modified_dt,
+            });
+        }
+
+        // Send the photos with signed URLs as a response
+        res.json(photosWithSignedUrls);
+    } catch (error) {
+        console.error('Error searching for photos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 app.listen(port, () => console.log(`Server running on port ${port}`));

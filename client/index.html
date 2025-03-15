@@ -48,7 +48,17 @@
     </nav>
 
     <main class="container mt-3">
-        <div class="gallery row" id="gallery"></div>
+
+        <form id="SearchPhotosForm">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" placeholder="Search photos by name..." id="SearchPhotosInput">
+                <button class="btn btn-success" type="submit" id="SearchPhotosBtn">Search</button>
+            </div>
+        </form>
+
+
+
+        <div class="gallery row row-cols-4" id="gallery"></div>
     </main>
 
 
