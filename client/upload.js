@@ -15,7 +15,7 @@ document.getElementById('PhotoForm').addEventListener('submit', async function (
     formData.append('photo', photoFile); // 'photo' is the field name used in the server
 
     try {
-        const response = await fetch('http://localhost:3000/photos', {
+        const response = await fetch('/photos', {
             method: 'POST',
             body: formData,
         });

@@ -2,7 +2,7 @@
 async function fetchPhotos(query = '') {
     try {
         // If query exists, use it; otherwise, fetch all photos
-        const url = query ? `http://localhost:3000/photos/search?query=${query}` : 'http://localhost:3000/photos';
+        const url = query ? `/photos/search?query=${query}` : '/photos';
         const response = await fetch(url);
         const photos = await response.json();
 
