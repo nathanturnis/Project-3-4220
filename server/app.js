@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const { Storage } = require('@google-cloud/storage');
-const mysql = require('mysql2/promise');
+const mysql = require('mysql2');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
@@ -14,6 +14,9 @@ const port = 3000;
 app.use(express.static(path.join(__dirname, '../client')));
 
 app.use(cors());
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 // Google Cloud Storage setup
@@ -28,7 +31,7 @@ const db = mysql.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-});
+}).promise();
 
 // Multer setup for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
@@ -168,6 +171,65 @@ app.get('/photos/search', async (req, res) => {
         res.json(photosWithSignedUrls);
     } catch (error) {
         console.error('Error searching for photos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    // Simple validation
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    try {
+        // Check if the username already exists
+        const [rows] = await db.query('SELECT * FROM user WHERE username = ?', [username]);
+        if (rows.length > 0) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        // Insert user into the database with the plain password
+        const userId = uuidv4();
+        const createdDt = new Date();
+        const modifiedDt = createdDt;
+
+        const sql = `
+            INSERT INTO user (id, username, password, created_dt, modified_dt)
+            VALUES (?, ?, ?, ?, ?)`;
+        await db.query(sql, [userId, username, password, createdDt, modifiedDt]);
+
+        res.json({ message: 'User registered successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Login User
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    // Simple validation
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    try {
+        // Check if the username exists
+        const [rows] = await db.query('SELECT * FROM user WHERE username = ?', [username]);
+        if (rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid username or password' });
+        }
+
+        // Check if the password matches
+        const user = rows[0];
+        if (user.password !== password) {
+            return res.status(400).json({ error: 'Invalid username or password' });
+        }
+
+        res.json({ message: 'Login successful' });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
