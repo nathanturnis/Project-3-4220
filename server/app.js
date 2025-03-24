@@ -11,6 +11,8 @@ const cors = require('cors');
 const app = express();
 const port = 3000;
 
+app.use(express.static(path.join(__dirname, '../client')));
+
 app.use(cors());
 
 process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
