@@ -1,8 +1,18 @@
-// Function to fetch photos based on the query (if any)
+// Function to fetch photos for the logged-in user
 async function fetchPhotos(query = '') {
     try {
-        // If query exists, use it; otherwise, fetch all photos
-        const url = query ? `/photos/search?query=${query}` : '/photos';
+        const userId = localStorage.getItem('user_id'); // Get user_id from localStorage
+
+        if (!userId) {
+            window.location.href = '/login.html'; // Redirect to login page
+            return;
+        }
+
+        // Construct the URL with user_id
+        const url = query
+            ? `/photos/search?query=${query}&user_id=${userId}`
+            : `/photos?user_id=${userId}`;
+
         const response = await fetch(url);
         const photos = await response.json();
 
@@ -12,7 +22,6 @@ async function fetchPhotos(query = '') {
 
         // Display each photo in the gallery
         photos.forEach(photo => {
-            // Create the image element
             const imgElement = document.createElement('img');
             imgElement.src = photo.link; // Set the signed URL
             imgElement.alt = photo.photo_name; // Set the photo name as alt text
@@ -20,26 +29,25 @@ async function fetchPhotos(query = '') {
 
             // Create the div that will hold both the image and the photo name
             const photoDiv = document.createElement('div');
-            photoDiv.classList.add('col'); // Use Bootstrap grid classes
+            photoDiv.classList.add('col');
 
-            // Create the photo name element and append it under the image
+            // Create the photo name element
             const photoName = document.createElement('p');
-            photoName.classList.add('text-center', 'mt-2'); // Center the text and add top margin
-            photoName.textContent = photo.photo_name; // Set the text to the photo's name
+            photoName.classList.add('text-center', 'mt-2');
+            photoName.textContent = photo.photo_name;
 
             // Create the download link
             const downloadLink = document.createElement('a');
-            downloadLink.href = photo.link; // Link to the signed URL
-            downloadLink.download = photo.photo_name; // The file name to be used during download
-            downloadLink.classList.add('btn', 'btn-primary', 'd-block', 'mt-2', 'mx-auto'); // Add Bootstrap classes for styling
-            downloadLink.textContent = 'Download'; // Set text for the button
+            downloadLink.href = photo.link;
+            downloadLink.download = photo.photo_name;
+            downloadLink.classList.add('btn', 'btn-primary', 'd-block', 'mt-2', 'mx-auto');
+            downloadLink.textContent = 'Download';
 
-            // Append the image, photo name, and download link to the photoDiv
+            // Append elements
             photoDiv.appendChild(imgElement);
             photoDiv.appendChild(photoName);
             photoDiv.appendChild(downloadLink);
 
-            // Append the photoDiv to the gallery container
             galleryElement.appendChild(photoDiv);
         });
 
@@ -68,6 +76,5 @@ window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('query');  // Get the 'query' parameter from the URL
 
-    // Call fetchPhotos with the query (if present)
     fetchPhotos(query || '');
 };

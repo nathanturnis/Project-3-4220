@@ -36,50 +36,54 @@ const db = mysql.createPool({
 // Multer setup for handling file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
+/**
+ * Middleware to extract user ID from request
+ * Assumes frontend sends `user_id` in the request body (since no auth mechanism exists)
+ */
+const requireUser = (req, res, next) => {
+    const userId = req.body.user_id || req.query.user_id;
+    if (!userId) {
+        return res.status(401).json({ error: 'User ID is required' });
+    }
+    req.userId = userId;
+    next();
+};
 
-// Fetch all photos API
-app.get('/photos', async (req, res) => {
+// Fetch all photos for the logged-in user
+app.get('/photos', requireUser, async (req, res) => {
     try {
-        // Step 1: Query the database to get all photos
-        const [rows] = await db.execute('SELECT * FROM gallery');
+        const [rows] = await db.execute('SELECT * FROM gallery WHERE user_id = ?', [req.userId]);
 
         if (rows.length === 0) {
             return res.status(404).json({ message: 'No photos found' });
         }
 
-        // Step 2: Generate signed URLs for each photo
-        const photosWithSignedUrls = [];
-
-        for (const photo of rows) {
-            const file = bucket.file(photo.link);  // `photo.link` stores the object path (e.g., `1710513278123-uuid-image.jpg`)
-
-            const options = {
+        const photosWithSignedUrls = await Promise.all(rows.map(async (photo) => {
+            const file = bucket.file(photo.link);
+            const [signedUrl] = await file.getSignedUrl({
                 version: 'v4',
                 action: 'read',
-                expires: Date.now() + 60 * 60 * 1000, // URL valid for 1 hour
-            };
+                expires: Date.now() + 60 * 60 * 1000, // 1 hour
+            });
 
-            const [signedUrl] = await file.getSignedUrl(options);
-
-            // Add the signed URL to the photo object
-            photosWithSignedUrls.push({
+            return {
                 id: photo.id,
                 user_id: photo.user_id,
                 photo_name: photo.photo_name,
-                link: signedUrl, // Store the signed URL in the response
+                link: signedUrl,
                 created_dt: photo.created_dt,
                 modified_dt: photo.modified_dt,
-            });
-        }
+            };
+        }));
 
-        // Step 3: Send the response with all photos and signed URLs
         res.json(photosWithSignedUrls);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/photos', upload.single('photo'), async (req, res) => {
+// Upload a new photo for the logged-in user
+app.post('/photos', upload.single('photo'), requireUser, async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         if (!req.body.photo_name) return res.status(400).json({ error: 'Photo name is required' });
@@ -88,28 +92,19 @@ app.post('/photos', upload.single('photo'), async (req, res) => {
         const uniqueFileName = `${Date.now()}-${uuidv4()}-${req.file.originalname}`;
         const file = bucket.file(uniqueFileName);
 
-        // Upload file to Google Cloud Storage (Private)
-        const stream = file.createWriteStream({
-            metadata: { contentType: req.file.mimetype },
-        });
+        const stream = file.createWriteStream({ metadata: { contentType: req.file.mimetype } });
 
         stream.on('error', (err) => res.status(500).json({ error: err.message }));
 
         stream.on('finish', async () => {
-            // File is private, store the object path instead of the signed URL
-            const objectPath = uniqueFileName;
-
-            // Insert metadata into Cloud SQL with the object path
             const createdDt = new Date();
             const modifiedDt = createdDt;
-            const userId = 1234; // Hardcoded user ID
             const id = uuidv4();
 
-            const sql = `
-                INSERT INTO gallery (id, user_id, photo_name, link, created_dt, modified_dt)
-                VALUES (?, ?, ?, ?, ?, ?)`;
-
-            await db.execute(sql, [id, userId, userFriendlyName, objectPath, createdDt, modifiedDt]);
+            await db.execute(
+                'INSERT INTO gallery (id, user_id, photo_name, link, created_dt, modified_dt) VALUES (?, ?, ?, ?, ?, ?)',
+                [id, req.userId, userFriendlyName, uniqueFileName, createdDt, modifiedDt]
+            );
 
             res.json({ message: 'Photo uploaded', photoName: userFriendlyName });
         });
@@ -120,57 +115,39 @@ app.post('/photos', upload.single('photo'), async (req, res) => {
     }
 });
 
-app.get('/photos/search', async (req, res) => {
+// Search photos for the logged-in user
+app.get('/photos/search', requireUser, async (req, res) => {
     try {
-        const { query } = req.query;  // Get the search query from the query string
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
-        }
+        const { query } = req.query;
+        if (!query) return res.status(400).json({ error: 'Search query is required' });
 
-        // SQL query to search photos by name (using LIKE for partial matching and LOWER for case-insensitivity)
-        const sql = `
-            SELECT id, user_id, photo_name, link, created_dt, modified_dt
-            FROM gallery
-            WHERE LOWER(photo_name) LIKE LOWER(?)`;  // Use LOWER() to make both sides case-insensitive
+        const [rows] = await db.execute(
+            'SELECT id, user_id, photo_name, link, created_dt, modified_dt FROM gallery WHERE user_id = ? AND LOWER(photo_name) LIKE LOWER(?)',
+            [req.userId, `%${query}%`]
+        );
 
-        const [rows] = await db.execute(sql, [`%${query}%`]);  // Execute the query with LIKE search
+        if (rows.length === 0) return res.status(404).json({ message: 'No photos found' });
 
-        if (rows.length === 0) {
-            return res.status(404).json({ message: 'No photos found' });
-        }
-
-        // Array to store the photos with signed URLs
-        const photosWithSignedUrls = [];
-
-        // Iterate over the rows to generate signed URLs for each photo
-        for (const photo of rows) {
-            const file = bucket.file(photo.link);  // `photo.link` stores the object path (e.g., `1710513278123-uuid-image.jpg`)
-
-            // Define options for generating the signed URL
-            const options = {
+        const photosWithSignedUrls = await Promise.all(rows.map(async (photo) => {
+            const file = bucket.file(photo.link);
+            const [signedUrl] = await file.getSignedUrl({
                 version: 'v4',
                 action: 'read',
-                expires: Date.now() + 60 * 60 * 1000, // URL valid for 1 hour
-            };
+                expires: Date.now() + 60 * 60 * 1000,
+            });
 
-            // Generate the signed URL
-            const [signedUrl] = await file.getSignedUrl(options);
-
-            // Push the photo object with the signed URL to the result array
-            photosWithSignedUrls.push({
+            return {
                 id: photo.id,
                 user_id: photo.user_id,
                 photo_name: photo.photo_name,
-                link: signedUrl, // Store the signed URL in the response
+                link: signedUrl,
                 created_dt: photo.created_dt,
                 modified_dt: photo.modified_dt,
-            });
-        }
+            };
+        }));
 
-        // Send the photos with signed URLs as a response
         res.json(photosWithSignedUrls);
     } catch (error) {
-        console.error('Error searching for photos:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -210,25 +187,17 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
-    // Simple validation
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
     }
 
     try {
-        // Check if the username exists
         const [rows] = await db.query('SELECT * FROM user WHERE username = ?', [username]);
-        if (rows.length === 0) {
+        if (rows.length === 0 || rows[0].password !== password) {
             return res.status(400).json({ error: 'Invalid username or password' });
         }
 
-        // Check if the password matches
-        const user = rows[0];
-        if (user.password !== password) {
-            return res.status(400).json({ error: 'Invalid username or password' });
-        }
-
-        res.json({ message: 'Login successful' });
+        res.json({ message: 'Login successful', user_id: rows[0].id });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

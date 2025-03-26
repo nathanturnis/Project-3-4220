@@ -53,26 +53,36 @@
 
 
     <script>
-        document.getElementById('registerForm').addEventListener('submit', function (e) {
+        document.getElementById('registerForm').addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            fetch('/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    alert(data.message); // Display message
-                })
-                .catch(err => alert(err.message));
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert("Registration successful! Redirecting to login...");
+                    window.location.href = '/login.html'; // Redirect to login page
+                } else {
+                    alert(data.message || "Registration failed. Please try again.");
+                }
+            } catch (err) {
+                alert("Network error. Please try again later.");
+                console.error(err);
+            }
         });
     </script>
+
 </body>
 
 </html>

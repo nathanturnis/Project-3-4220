@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Gallery</title>
     <style>
+        main {
+            margin-bottom: 60px;
+        }
+
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -41,6 +45,11 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" aria-current="page" href="/upload.html">Upload</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav navbar-right ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="/login.html">Logout</a>
                     </li>
                 </ul>
             </div>

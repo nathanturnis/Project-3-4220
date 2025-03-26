@@ -52,26 +52,43 @@
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function (e) {
+        window.onload = () => {
+            localStorage.removeItem("user_id");
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    alert(data.message); // Display message
-                })
-                .catch(err => alert(err.message));
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store user ID in localStorage
+                    localStorage.setItem('user_id', data.user_id);
+
+                    // Redirect to gallery page
+                    window.location.href = '/index.html';
+                } else {
+                    alert(data.message || "Login failed. Please try again.");
+                }
+            } catch (err) {
+                alert("Network error. Please try again later.");
+                console.error(err);
+            }
         });
     </script>
+
 </body>
 
 </html>
