@@ -203,5 +203,35 @@ app.post('/login', async (req, res) => {
     }
 });
 
+app.get("/download-file", async (req, res) => {
+    try {
+        // Get the ACTUAL stored filename from database
+        const storedFileName = req.query.filename; // Should be like "1743040983313-a3ad8d9f....jpeg"
+        const photoName = req.query.photoName;
+        console.log("here is the querey \n "+ JSON.stringify(req.query)) 
+
+        
+        const storage = new Storage();
+        const file = storage.bucket(process.env.BUCKET_NAME)
+            .file(decodeURIComponent(storedFileName));
+
+
+        const fileExtension = storedFileName.split('.').pop();
+        const downloadFileName = `${photoName}.${fileExtension}`;
+
+            
+        res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+        
+        file.createReadStream()
+            .on('error', (err) => {
+                console.error('GCS Error:', err);
+                res.status(404).send('File not found');
+            })
+            .pipe(res);
+    } catch (error) {
+        console.error('Download error:', error);
+        res.status(500).send('Download failed');
+    }
+});
 
 app.listen(port, () => console.log(`Server running on port ${port}`));

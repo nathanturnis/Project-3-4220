@@ -1,79 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Photo Gallery</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <style>
-        main {
-            margin-bottom: 60px;
-        }
-
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-        }
-
-        .gallery img {
-            width: 100%;
-            height: auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+      /* Custom styles for a consistent card layout */
+      .photo-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .photo-card img {
+        width: 100%;
+        height: 200px; /* Fixed height for images */
+        object-fit: cover;
+      }
+      .photo-card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
     </style>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-        crossorigin="anonymous"></script>
-</head>
+  </head>
+  <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="index.html">Photo Gallery</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <!-- Navigation Links will be injected based on login status -->
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="navLinks"></ul>
 
-<body>
-    <nav class="navbar bg-dark navbar-expand-lg border-body" data-bs-theme="dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">Photo Gallery</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+          <!-- Search Form -->
+          <form class="d-flex" id="SearchPhotosForm">
+            <input
+              class="form-control me-2"
+              type="search"
+              placeholder="Search photos"
+              aria-label="Search"
+              id="SearchPhotosInput"
+            />
+            <button class="btn btn-outline-success" type="submit">
+              Search
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="/index.html">Gallery</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" aria-current="page" href="/upload.html">Upload</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav navbar-right ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="/login.html">Logout</a>
-                    </li>
-                </ul>
-            </div>
+          </form>
         </div>
+      </div>
     </nav>
 
-    <main class="container mt-3">
+    <!-- Gallery Container -->
+    <div class="container mt-4">
+      <div id="gallery" class="row row-cols-1 row-cols-md-3 g-4">
+        <!-- Photos will be loaded here as cards -->
+      </div>
+    </div>
 
-        <form id="SearchPhotosForm">
-            <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="Search photos by name..." id="SearchPhotosInput">
-                <button class="btn btn-success" type="submit" id="SearchPhotosBtn">Search</button>
-            </div>
-        </form>
+    <!-- Updated index.js for photo fetching and card creation -->
+    <script src="index.js"></script>
 
+    <script>
+      // Navigation and logout functionality
+      const navLinks = document.getElementById("navLinks");
+      const username = localStorage.getItem("username");
 
+      if (username) {
+        navLinks.innerHTML = `
+          <li class="nav-item">
+            <span class="nav-link">Welcome, ${username}</span>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="upload.html">Upload Photo</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="logoutLink">Logout</a>
+          </li>
+        `;
+      } else {
+        navLinks.innerHTML = `
+          <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="register.html">Register</a></li>
+        `;
+      }
 
-        <div class="gallery row row-cols-4" id="gallery"></div>
-    </main>
+      if (username) {
+        document.getElementById("logoutLink").addEventListener("click", (e) => {
+          e.preventDefault();
+          localStorage.removeItem("username");
+          localStorage.removeItem("user_id");
+          window.location.href = "login.html";
+        });
+      }
+    </script>
 
-
-
-    <script src="./index.js"></script>
-
-</body>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
 </html>

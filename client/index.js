@@ -27,6 +27,8 @@ async function fetchPhotos(query = '') {
             imgElement.alt = photo.photo_name; // Set the photo name as alt text
             imgElement.classList.add('img-fluid', 'w-100'); // Use Bootstrap classes for responsive images
 
+            const downloadBtn = document.createElement('a');
+
             // Create the div that will hold both the image and the photo name
             const photoDiv = document.createElement('div');
             photoDiv.classList.add('col');
@@ -38,10 +40,36 @@ async function fetchPhotos(query = '') {
 
             // Create the download link
             const downloadLink = document.createElement('a');
-            downloadLink.href = photo.link;
+            // downloadLink.href = photo.link;
             downloadLink.download = photo.photo_name;
             downloadLink.classList.add('btn', 'btn-primary', 'd-block', 'mt-2', 'mx-auto');
             downloadLink.textContent = 'Download';
+            
+            downloadLink.onclick = async (e) => {
+                console.log("nals")
+                e.preventDefault();
+                try {
+                    // Extract stored filename from URL
+                    const fullUrl = photo.link;
+                    const storedFileName = fullUrl.split('/').pop().split('?')[0];
+                    
+                    // Get user-friendly name from your photo object
+                    const photoName = photo.photo_name;
+                    
+                    const downloadUrl = `/download-file?filename=${
+                        encodeURIComponent(storedFileName)
+                    }&photoName=${
+                        encodeURIComponent(photoName)
+                    }`;
+                    
+                    const tempLink = document.createElement('a');
+                    tempLink.href = downloadUrl;
+                    tempLink.click();
+                } catch (error) {
+                    console.error('Download failed:', error);
+                }
+            
+            };
 
             // Append elements
             photoDiv.appendChild(imgElement);
