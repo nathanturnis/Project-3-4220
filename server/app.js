@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, '../client')));
 
@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+//process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 // Google Cloud Storage setup
 const storage = new Storage();
 const bucketName = process.env.BUCKET_NAME;
@@ -208,9 +208,9 @@ app.get("/download-file", async (req, res) => {
         // Get the ACTUAL stored filename from database
         const storedFileName = req.query.filename; // Should be like "1743040983313-a3ad8d9f....jpeg"
         const photoName = req.query.photoName;
-        console.log("here is the querey \n "+ JSON.stringify(req.query)) 
+        console.log("here is the querey \n " + JSON.stringify(req.query))
 
-        
+
         const storage = new Storage();
         const file = storage.bucket(process.env.BUCKET_NAME)
             .file(decodeURIComponent(storedFileName));
@@ -219,9 +219,9 @@ app.get("/download-file", async (req, res) => {
         const fileExtension = storedFileName.split('.').pop();
         const downloadFileName = `${photoName}.${fileExtension}`;
 
-            
+
         res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
-        
+
         file.createReadStream()
             .on('error', (err) => {
                 console.error('GCS Error:', err);

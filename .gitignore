@@ -2,3 +2,4 @@
 server/google-service.json
 node_modules
 **/node_modules
+app.yaml
